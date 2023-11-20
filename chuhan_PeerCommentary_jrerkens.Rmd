@@ -1,0 +1,80 @@
+---
+title: "Homework5"
+author: "Lia"
+date: "2023-11-16"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    number_sections: true
+    theme: lumen
+---
+
+# Jimmy's comments!
+
+Good job! I was unfamiliar with the `boots` package so was interesting to see it be used. I'm a bit unsure how the algorithm works out compared to a general for loop, would like to see how it works out under the hood! I'd like to see some more comments throughout the code just because it was a bit of a situation to run and figure out. What's the rationale behind the function you create for instance?
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Bootstrapping Standard Erros and CIs for Linear Models. 
+Load the packages first. 
+```{r}
+library(curl)
+library(dplyr)
+library(boot) # what's this package about? - Jimmy
+```
+## Challenge 1
+**Description: **Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your β coeffiecients (slope and intercept).
+
+
+Read the file. 
+```{r}
+f <- curl("https://raw.githubusercontent.com/fuzzyatelin/fuzzyatelin.github.io/master/AN588_Fall21/KamilarAndCooperData.csv")
+KC <- read.csv(f, header=TRUE, sep=",", stringsAsFactors=FALSE) %>% filter(!is.na(HomeRange_km2)) %>% filter(!is.na(Body_mass_female_mean))
+# Smart to filter out na's now! I think you only need one filter() statement though -Jimmy
+```
+
+Modeling. 
+```{r}
+lHR <- log(KC$HomeRange_km2) # I'm not sure I'd initialize all these variables just since it could be a bit confusing what's going on like 2 months removed from a project, "l" means both log and linear here too  - Jimmy
+lBmfm <- log(KC$Body_mass_female_mean)
+lmod <- lm(lHR ~ lBmfm, data=KC)
+summary(lmod)
+coeffs <- lmod$coefficients
+coeffs
+```
+
+## Challenge 2
+**Description: **Then, use bootstrapping to sample from your data 1000 times with replacement, each time fitting the same model and calculating the same coefficients. This generates a sampling distribution for each β coefficient.
+
+```{r}
+set.seed(123)
+fun <- function(formula, data, indices) {
+  d <- data[indices, ]
+  fit <- lm(formula, data=d) # I'm a bit confused on what's going on with this function - Jimmy  
+  return(coef(fit)) # i've never used boot() before is this necessary for getting that to work? - Jimmy
+}
+reps <- boot(data=KC, statistic=fun, R=1000, formula=log(HomeRange_km2) ~ log(Body_mass_female_mean))
+reps
+plot(reps) # what is t? What is this a measure of? - Jimmy
+```
+
+```{r}
+confint(lmod, level=0.95)
+boot.ci(reps, type="bca", index=1) # I think when you do boot.ci you end up bootstrapping twice - Jimmy
+boot.ci(reps, type="bca", index=2) # I think you just need to do confint() here - Jimmy
+```
+**Question 1: **
+How does the former compare to the SE estimated from your entire dataset using the formula for standard error implemented in lm()?
+
+**Answer: **
+SDE of bootstrapping β coefficients are 0.58297075 and 0.07553405. It looks better than  0.67293 and 0.08488 which comes from the model. 
+
+**Question 2: **
+How does the latter compare to the 95% CI estimated from your entire dataset?
+
+**Answer: **
+In the bootstrapped method, intercept is -10.766 and -8.372, with slope of 0.898 and 1.212. In the non-bootstrapped method, intercept is -10.7720889 and -8.110374, with slope of 0.8685707 and 1.204292. the intercept in the bootstrapped method looks tighter. 
