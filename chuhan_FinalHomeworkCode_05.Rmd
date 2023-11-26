@@ -1,0 +1,78 @@
+---
+title: "Homework5"
+author: "Lia"
+date: "2023-11-26"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    number_sections: true
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Bootstrapping Standard Erros and CIs for Linear Models. 
+Load the packages first. 
+```{r}
+library(curl)
+library(dplyr)
+library(boot)
+```
+## Challenge 1
+**Description: **Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your β coeffiecients (slope and intercept).
+
+
+Read the file. 
+```{r}
+f <- curl("https://raw.githubusercontent.com/fuzzyatelin/fuzzyatelin.github.io/master/AN588_Fall21/KamilarAndCooperData.csv")
+KC <- read.csv(f, header=TRUE, sep=",", stringsAsFactors=FALSE) %>% filter(!is.na(HomeRange_km2)) %>% filter(!is.na(Body_mass_female_mean))
+```
+
+Modeling. 
+```{r}
+lHR <- log(KC$HomeRange_km2)
+lBmfm <- log(KC$Body_mass_female_mean)
+limod <- lm(lHR ~ lBmfm, data=KC)
+summary(limod)
+coeffs <- limod$coefficients
+coeffs
+```
+
+## Challenge 2
+**Description: **Then, use bootstrapping to sample from your data 1000 times with replacement, each time fitting the same model and calculating the same coefficients. This generates a sampling distribution for each β coefficient.
+
+```{r}
+set.seed(123)
+fun <- function(formula, data, indices) {
+  d <- data[indices, ]
+  fit <- lm(formula, data=d)
+  return(coef(fit))
+}
+reps <- boot(data=KC, statistic=fun, R=1000, formula=log(HomeRange_km2) ~ log(Body_mass_female_mean))
+reps
+plot(reps)
+```
+
+```{r}
+confint(limod, level=0.95)
+boot.ci(reps, type="bca", index=1) #intercept of model
+boot.ci(reps, type="bca", index=2) #disp predictor variable
+```
+
+boot.ci() with type="bca" generates the adjusted bootstrap percentile (BCa) interval. reps here is an object containing the output of a bootstrap calculation so it will not cuase repeating bootstrapping. 
+
+**Question 1: **
+How does the former compare to the SE estimated from your entire dataset using the formula for standard error implemented in lm()?
+
+**Answer: **
+SDE of bootstrapping β coefficients are 0.58297075 and 0.07553405. It looks better than  0.67293 and 0.08488 which comes from the model. 
+
+**Question 2: **
+How does the latter compare to the 95% CI estimated from your entire dataset?
+
+**Answer: **
+In the bootstrapped method, intercept is -10.766 and -8.372, with slope of 0.898 and 1.212. In the non-bootstrapped method, intercept is -10.7720889 and -8.110374, with slope of 0.8685707 and 1.204292. the intercept in the bootstrapped method looks tighter. 
